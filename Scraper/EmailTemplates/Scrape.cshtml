@@ -1,0 +1,36 @@
+﻿@model Scraper.Models.EmailModel
+
+<table style="margin: 0px; padding: 0px; width: 100%; height: 100%;" border="0" cellspacing="0" cellpadding="0" bgcolor="#efefef">
+    <tbody>
+        <tr style="margin: 0px; padding: 0px;">
+            <td align="center">
+                <table style="width: 570px; height: 100%;" border="0" bgcolor="#ffffff">
+                    <tbody>
+                        <tr>
+                            <td style="padding: 15px;" valign="top" bgcolor="#ffffff">
+                                <table style="width: 570px;" border="0">
+                                    <tbody>
+                                        <tr>
+                                            <td style="text-align: right;" height="189" align="right" valign="top">
+                                                <img src="https://blog.hartleybrody.com/wp-content/uploads/2012/12/scraper-tool.jpg" border="0" alt="Scraper" width="181" height="106" />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">Automatic email from Web scraper:</p>
+                                                <p style="font-size: 13px; margin: 0 0 1.7em; color: #666; font-family: Lucida Sans Unicode; line-height: 1.5em;">
+                                                    <span style="white-space: pre-line">Web scrape of @Model.RootUrl was successfully completed on @Model.DateTime</span>
+                                                    <span style="white-space: pre-line">@Model.Urls @(Model.Urls < 2 ? "Url was" : "Urls were") successfully parsed. </span>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </td>
+        </tr>
+    </tbody>
+</table>
