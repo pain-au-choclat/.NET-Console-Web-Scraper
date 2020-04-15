@@ -22,38 +22,43 @@
                                                     <span style="white-space: pre-line">Web comparison was successfully completed on @Model.DateTime</span>
                                                     <span style="white-space: pre-line">Please find changes to text/html files below:</span>
                                                 </p>
-                                                @if (Model.RemovedFromLatest.Count > 0)
+                                                @if (Model.LinesRemovedFromOriginal.Count > 0)
                                                 {
                                                     <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">The following lines have been removed from the website:</p>
-                                                    foreach (var line in Model.RemovedFromLatest)
+                                                    foreach (var line in Model.LinesRemovedFromOriginal)
                                                     {
                                                         <p style="font-size: 13px; margin: 0 0 1.7em; color: #666; font-family: Lucida Sans Unicode; line-height: 1.5em;">
                                                             <span style="white-space: pre-line">@line</span>
                                                         </p>
                                                     }
                                                 }
-                                                @if (Model.AddedToLatest.Count > 0)
+                                                @if (Model.LinesAddedToLatest.Count > 0)
                                                 {
                                                     <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">The following lines have been added to the website:</p>
-                                                    foreach (var line in Model.AddedToLatest)
+                                                    foreach (var line in Model.LinesAddedToLatest)
                                                     {
                                                         <p style="font-size: 13px; margin: 0 0 1.7em; color: #666; font-family: Lucida Sans Unicode; line-height: 1.5em;">
                                                             <span style="white-space: pre-line">@line</span>
                                                         </p>
                                                     }
                                                 }
-                                                <p style="font-size: 13px; margin: 0 0 1.7em; color: #666; font-family: Lucida Sans Unicode; line-height: 1.5em;">
-                                                    <span style="white-space: pre-line">
-                                                        @(Model.FilesRemoved ? "Please find files that have been removed/replaced below:" :
-                                                        "Please find files that have been added below:")
-                                                    </span>
-                                                </p>
-                                                @if (Model.FilesDifferences.Count > 0)
+                                                @if (Model.FilesRemoved.Count > 0)
                                                 {
-                                                    foreach (var file in Model.FilesDifferences)
+                                                    <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">The following files have been removed:</p>
+                                                    foreach (var fileName in Model.FilesRemoved)
                                                     {
                                                         <p style="font-size: 13px; margin: 0 0 1.7em; color: #666; font-family: Lucida Sans Unicode; line-height: 1.5em;">
-                                                            <span style="white-space: pre-line">@(Model.FilesRemoved ? "[REMOVED]" : "[ADDED]") @file</span>
+                                                            <span style="white-space: pre-line">@fileName</span>
+                                                        </p>
+                                                    }
+                                                }
+                                                @if (Model.FilesAdded.Count > 0)
+                                                {
+                                                    <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">The following files have been added:</p>
+                                                    foreach (var fileName in Model.FilesAdded)
+                                                    {
+                                                        <p style="font-size: 13px; margin: 0 0 1.7em; color: #666; font-family: Lucida Sans Unicode; line-height: 1.5em;">
+                                                            <span style="white-space: pre-line">@fileName</span>
                                                         </p>
                                                     }
                                                 }

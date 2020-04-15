@@ -76,7 +76,13 @@ namespace Scraper
                     Console.ReadLine();
 
                     if (_config.SendOutputEmails)
-                    {
+                    {   
+                        if (_config.ConsoleLogging)
+                        {
+                            Console.WriteLine("");
+                            Console.WriteLine("Sending successful web scrape email...");
+                        }
+
                         var subject = $"Web scrape of {_config.RootUrl} completed successfully!";
                         await SendEmail(subject, new ComparisonModel(), count).ConfigureAwait(false);
                     }
@@ -135,6 +141,12 @@ namespace Scraper
                 {
                     if (_config.SendOutputEmails)
                     {
+                        if (_config.ConsoleLogging)
+                        {
+                            Console.WriteLine("");
+                            Console.WriteLine("Sending successful comparison email...");
+                        }
+
                         var subject = "Web scraper has completed comparison";
                         await SendEmail(subject, comparison, 0).ConfigureAwait(false);
                     }
@@ -226,10 +238,7 @@ namespace Scraper
         /// Generic send email, using fluentemail and razor templates
         /// </summary>
         /// <param name="subject"></param>
-        /// <param name="addedToLatest"></param>
-        /// <param name="removedFromLatest"></param>
-        /// <param name="files"></param>
-        /// <param name="filesRemoved"></param>
+        /// <param name="comparison"></param>
         /// <param name="urlCount"></param>
         public async Task SendEmail(string subject, ComparisonModel comparison, int urlCount)
         {
@@ -249,13 +258,13 @@ namespace Scraper
 
             var model = new EmailModel()
             {
-                FilesDifferences = comparison.FileDifferences ?? new List<string>(),
+                FilesAdded = comparison.FilesAdded?.ToList() ?? new List<string>(),
+                FilesRemoved = comparison.FilesRemoved?.ToList() ?? new List<string>(),
                 FileNamesList = comparison.FileNamesList?.ToList() ?? new List<string>(),
-                AddedToLatest = comparison.AddedToLatest?.ToList() ?? new List<string>(),
-                RemovedFromLatest = comparison.RemovedFromLatest?.ToList() ?? new List<string>(),
+                LinesAddedToLatest = comparison.LinesAddedToLatest?.ToList() ?? new List<string>(),
+                LinesRemovedFromOriginal = comparison.LinesRemovedFromOriginal?.ToList() ?? new List<string>(),
                 DateTime = DateTime.Now,
                 RootUrl = _config.RootUrl,
-                FilesRemoved = comparison.IsFilesRemoved,
                 Urls = urlCount
             };
 
@@ -272,13 +281,19 @@ namespace Scraper
                 {
                     if (_config.ConsoleLogging)
                     {
+                        Console.WriteLine("");
                         Console.WriteLine("Web scraper successfully sent email!");
                     }
                 }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Something went bad: {e}");
+                Console.WriteLine("");
+                Console.WriteLine("Sending email failed, please ensure appsettings.json is configured correctly.");
+                Console.WriteLine("");
+                Console.WriteLine($"Error message: {e}");
+                Console.WriteLine("");
+                Console.WriteLine("Please return to exit...");
                 Console.ReadLine();
             }
         }

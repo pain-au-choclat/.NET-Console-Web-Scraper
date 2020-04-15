@@ -38,71 +38,30 @@ namespace Scraper
             var firstFolderFileNames = GetFilesNames(originalFolder);
             var secondFolderFileNames = GetFilesNames(latestFolder);
 
-            // Check files count and output if any are missing or file name has changed
-            var fileDifferences = new List<string>();
-            var filesHaveBeenRemoved = false;
+            IEnumerable<string> removedFromOriginal = firstFolderFileNames.Except(secondFolderFileNames);
+            IEnumerable<string> addedToOriginal = secondFolderFileNames.Except(firstFolderFileNames);
 
-            if (firstFolderFileNames.Count() > secondFolderFileNames.Count())
+            if (_config.ConsoleLogging)
             {
-                // Find the files that are missing
-                IEnumerable<string> differences = firstFolderFileNames.Except(secondFolderFileNames);
-
-                if (_config.ConsoleLogging && differences.Count() > 0)
-                {
-                    FolderDifferencesConsoleLogging(differences, firstFolderFileNames.Count(), secondFolderFileNames.Count(),
-                        originalFolder.Name, latestFolder.Name);
-                }
-
-                if (differences.Count() > 0)
-                {
-                    fileDifferences = differences.ToList();
-                    filesHaveBeenRemoved = true;
-                }
-            }
-            else if (firstFolderFileNames.Count() == secondFolderFileNames.Count())
-            {
-                if (_config.ConsoleLogging)
-                {
-                    Console.WriteLine("Both folders have the same file count");
-                }
-            }
-            else
-            {
-                // Find the files that are missing
-                IEnumerable<string> differences = secondFolderFileNames.Except(firstFolderFileNames);
-
-                if (_config.ConsoleLogging && differences.Count() > 0)
-                {
-                    FolderDifferencesConsoleLogging(differences, firstFolderFileNames.Count(), secondFolderFileNames.Count,
-                        originalFolder.Name, latestFolder.Name);
-                }
-
-                if (differences.Count() > 0)
-                {
-                    fileDifferences = differences.ToList();
-                    filesHaveBeenRemoved = false;
-                }
+                FolderDifferencesConsoleLogging(removedFromOriginal, addedToOriginal, originalFolder.Name, latestFolder.Name);
             }
 
             // Check .txt files for changes
-            var (addedToLatest, removedFromLatest, fileNamesList) = GetTextFileChanges(originalFolder, latestFolder);
-            if (addedToLatest.Count > 0 && removedFromLatest.Count > 0)
-            {
-                if (_config.ConsoleLogging)
-                {
-                    TextDifferencesConsoleLogging(addedToLatest, removedFromLatest);
-                }
+            var (linesAddedToLatest, linesRemovedFromOriginal, fileNamesList) = GetTextFileChanges(originalFolder, latestFolder);
 
+            if (_config.ConsoleLogging)
+            {
+                TextDifferencesConsoleLogging(linesAddedToLatest, linesRemovedFromOriginal);
             }
 
             var comparisonModel = new ComparisonModel()
             {
-                AddedToLatest = addedToLatest,
-                RemovedFromLatest = removedFromLatest,
+                LinesAddedToLatest = linesAddedToLatest,
+                LinesRemovedFromOriginal = linesRemovedFromOriginal,
                 FileNamesList = fileNamesList,
-                FileDifferences = fileDifferences,
+                FilesAdded = addedToOriginal,
+                FilesRemoved = removedFromOriginal,
                 IsComparisonComplete = true,
-                IsFilesRemoved = filesHaveBeenRemoved
             };
 
             return comparisonModel;
@@ -111,50 +70,44 @@ namespace Scraper
         /// <summary>
         /// Deals with the console logging from the text file differences
         /// </summary>
-        /// <param name="textChanges"></param>
-        /// <param name="textOriginal"></param>
-        public void TextDifferencesConsoleLogging(ConcurrentBag<string> textChanges, ConcurrentBag<string> textOriginal)
+        /// <param name="linesAdded"></param>
+        /// <param name="linesRemovedFromOriginal"></param>
+        public void TextDifferencesConsoleLogging(ConcurrentBag<string> linesAdded, ConcurrentBag<string> linesRemovedFromOriginal)
         {
-            var changesList = textChanges.ToList();
-            var originalList = textOriginal.ToList();
-            var lines = changesList.Count();
-            var linesLeast = originalList.Count();
-            var linesSwitched = false;
+            var linesAddedList = linesAdded.ToList();
+            var removedFromOriginalList = linesRemovedFromOriginal.ToList();
 
-            if (originalList.Count() > changesList.Count())
+            if (linesAddedList.Count() > 0)
             {
-                lines = originalList.Count();
-                linesLeast = changesList.Count();
-                linesSwitched = true;
-            }
+                Console.WriteLine("");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"The following lines have been added to {_config.RootUrl}:");
+                Console.WriteLine("");
+                Console.ForegroundColor = ConsoleColor.Gray;
 
-            for (var i = 0; i < lines; i++)
-            {
-                if (i < linesLeast)
+                foreach (var line in linesAddedList)
                 {
                     Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"[ORIGINAL]: {originalList[i]}");
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[CHANGE]: {changesList[i]}");
-                }
-                else
-                {
-                    if (linesSwitched)
-                    {
-                        Console.ForegroundColor = ConsoleColor.White;
-                        Console.WriteLine($"[ORIGINAL]: {originalList[i]}");
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"[CHANGE]: [LINE HAS BEEN REMOVED]");
-                    }
-                    else
-                    {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine($"[CHANGE]: {changesList[i]}");
-                    }
+                    Console.WriteLine(line);
+                    Console.ForegroundColor = ConsoleColor.Gray;
+
                 }
             }
+            if (removedFromOriginalList.Count() > 0)
+            {
+                Console.WriteLine("");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"The following lines have been removed from {_config.RootUrl}:");
+                Console.WriteLine("");
+                Console.ForegroundColor = ConsoleColor.White;
 
-            Console.ForegroundColor = ConsoleColor.White;
+                foreach (var line in linesAddedList)
+                {
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine(line);
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                }
+            }
 
             if (!_config.RunScheduled)
             {
@@ -168,33 +121,44 @@ namespace Scraper
         /// <summary>
         /// Deal with all the console logging from the file differences
         /// </summary>
-        /// <param name="diff"></param>
-        /// <param name="firstFolderCount"></param>
-        /// <param name="secondFolderCount"></param>
+        /// /// <param name="removedFromOriginal"></param>
+        /// /// <param name="addedToOriginal"></param>
         /// <param name="originalFolderName"></param>
         /// <param name="latestFolderName"></param>
-        public void FolderDifferencesConsoleLogging(IEnumerable<string> diff, int firstFolderCount, int secondFolderCount,
+        public void FolderDifferencesConsoleLogging(IEnumerable<string> removedFromOriginal, IEnumerable<string> addedToOriginal,
             string originalFolderName, string latestFolderName)
         {
-            Console.Clear();
-            Console.WriteLine($"[{latestFolderName}]: Has a greater file count of {secondFolderCount}");
-            Console.WriteLine($"[{originalFolderName}]: Has a count of {firstFolderCount}");
-            Console.WriteLine("");
-
-            Console.WriteLine($"The following file/files are in [{latestFolderName}] but not [{originalFolderName}]...");
-            Console.WriteLine("");
-
-            foreach (var fileName in diff)
+            if (removedFromOriginal.Count() > 0)
             {
+                Console.Clear();
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(fileName);
-                Console.ForegroundColor = ConsoleColor.White;
+                Console.WriteLine($"The following files have been removed from [{originalFolderName}]:");
+                Console.WriteLine("");
+                foreach (var fileName in removedFromOriginal)
+                {
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine(fileName);
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                }
+            }
+            if (addedToOriginal.Count() > 0)
+            {
+                Console.WriteLine("");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"The following files have been added to [{latestFolderName}]:");
+                Console.WriteLine("");
+                foreach (var fileName in addedToOriginal)
+                {
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine(fileName);
+                    Console.ForegroundColor = ConsoleColor.Gray;
+                }
             }
 
             if (!_config.RunScheduled)
             {
                 Console.WriteLine("");
-                Console.WriteLine("Please return to proceed...");
+                Console.WriteLine("Please return to proceed to txt/html file differences...");
                 Console.WriteLine("");
                 Console.ReadLine();
             }

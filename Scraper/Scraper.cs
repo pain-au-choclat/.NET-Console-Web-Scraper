@@ -62,8 +62,9 @@ namespace Scraper
             if (_config.ConsoleLogging && !_config.RunScheduled)
             {
                 Console.Clear();
+                Console.WriteLine("");
                 Console.WriteLine($"New folder has been created: {newDirectory}");
-                Console.WriteLine("Let us proceed");
+                Console.WriteLine("Let us proceed...");
                 Console.ReadLine();
             }
 
@@ -400,48 +401,6 @@ namespace Scraper
 
             // Ensure list has no duplicates
             return urls.Distinct().ToList();
-        }
-
-        /// <summary>
-        /// Deprecated method, yeah should probably delete it.
-        /// </summary>
-        /// <param name="urls"></param>
-        /// <returns></returns>
-        public async Task<bool> GetHtmlForAllUrlsAsync(List<string> urls)
-        {
-            var pageCount = 1;
-            var fileName = $"{GetPlainUrl(_config.RootUrl)}_page_";
-
-            foreach (var url in urls)
-            {
-                var htmlResponse = new HttpResponseMessage();
-                var responseBody = "";
-                try
-                {
-                    htmlResponse = await _httpClient.GetAsync(url).ConfigureAwait(false);
-                    if (htmlResponse.StatusCode == HttpStatusCode.OK)
-                    {
-                        responseBody = await htmlResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        if (!string.IsNullOrWhiteSpace(responseBody))
-                        {
-                            using StreamWriter sw = new StreamWriter(@$"{_config.FilePath}\{fileName}{pageCount}.txt");
-                            await sw.WriteLineAsync(url.ToUpper());
-                            await sw.WriteLineAsync("");
-                            await sw.WriteLineAsync("");
-                            await sw.WriteLineAsync(responseBody);
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine("Http request exception caught!");
-                    Console.WriteLine($"Message {e.Message}");
-                }
-
-                pageCount++;
-            }
-
-            return true;
         }
     }
 }
