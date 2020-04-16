@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Scraper
@@ -88,6 +89,7 @@ namespace Scraper
                 foreach (var line in linesAddedList)
                 {
                     Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine("");
                     Console.WriteLine(line);
                     Console.ForegroundColor = ConsoleColor.Gray;
 
@@ -101,9 +103,10 @@ namespace Scraper
                 Console.WriteLine("");
                 Console.ForegroundColor = ConsoleColor.White;
 
-                foreach (var line in linesAddedList)
+                foreach (var line in linesRemovedFromOriginal)
                 {
                     Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine("");
                     Console.WriteLine(line);
                     Console.ForegroundColor = ConsoleColor.Gray;
                 }
@@ -198,22 +201,42 @@ namespace Scraper
                         }
 
                         // In the original file but have been removed from the latest file (have been removed)
-                        foreach (var line in inFirstNotInSecond)
+                        if (inFirstNotInSecond.Count() > 0)
                         {
-                            var convertedLine = _htmlToText.Convert(line);
-                            if (!string.IsNullOrEmpty(convertedLine))
+                            foreach (var line in inFirstNotInSecond)
                             {
-                                originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                                if (IsStringHtml(line))
+                                {
+                                    var convertedLine = _htmlToText.Convert(line);
+                                    if (!string.IsNullOrEmpty(convertedLine))
+                                    {
+                                        originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                                    }
+                                }
+                                else
+                                {
+                                    originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + line);
+                                }
                             }
                         }
 
                         // In the latest file but was not present in the original (have been added)
-                        foreach (var line in inSecondNotInFirst)
+                        if (inSecondNotInFirst.Count() > 0)
                         {
-                            var convertedLine = _htmlToText.Convert(line);
-                            if (!string.IsNullOrEmpty(convertedLine))
+                            foreach (var line in inSecondNotInFirst)
                             {
-                                changesListAddedToLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                                if (IsStringHtml(line))
+                                {
+                                    var convertedLine = _htmlToText.Convert(line);
+                                    if (!string.IsNullOrEmpty(convertedLine))
+                                    {
+                                        changesListAddedToLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                                    }
+                                }
+                                else
+                                {
+                                    changesListAddedToLatest.Add($"[{latestFile.Name}]: " + line);
+                                }
                             }
                         }
                     }
@@ -221,6 +244,17 @@ namespace Scraper
             });
 
             return (changesListAddedToLatest, originalListRemovedFromLatest, fileNameList);
+        }
+
+        /// <summary>
+        /// Check to see if a line is html
+        /// </summary>
+        /// <param name="line"></param>
+        /// <returns></returns>
+        public bool IsStringHtml(string line)
+        {
+            var htmlRegex = new Regex(@"<\s*([^ >]+)[^>]*>.*?<\s*/\s*\1\s*>");
+            return htmlRegex.Match(line).Success;
         }
 
         /// <summary>
