@@ -15,12 +15,10 @@ namespace Scraper
     public class Compare : ICompare
     {
         private readonly ScraperConfiguration _config;
-        private readonly IHtmlToText _htmlToText;
 
-        public Compare(IOptions<ScraperConfiguration> config, IHtmlToText htmlToText)
+        public Compare(IOptions<ScraperConfiguration> config)
         {
             _config = config.Value;
-            _htmlToText = htmlToText;
         }
 
         public ComparisonModel StartCompare(string folderOne,

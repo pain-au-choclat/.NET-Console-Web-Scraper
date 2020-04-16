@@ -13,8 +13,8 @@ namespace Scraper
     public class HtmlToText : IHtmlToText
     {
         // Static data tables
-        private static Dictionary<string, string> _tags;
-        private static HashSet<string> _ignoreTags;
+        private static readonly Dictionary<string, string> _tags;
+        private static readonly HashSet<string> _ignoreTags;
 
         // Instance variables
         private TextBuilder _text;

@@ -35,8 +35,6 @@ namespace Scraper
 
                 services.AddSingleton<ICompare, Compare>();
 
-                services.AddSingleton<IHtmlToText, HtmlToText>();
-
                 services.AddFluentEmail("")
                 .AddRazorRenderer(Path.Join(currentPath, "EmailTemplates"))
                 .AddSmtpSender(
