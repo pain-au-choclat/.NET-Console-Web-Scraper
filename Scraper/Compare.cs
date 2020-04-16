@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -48,7 +49,7 @@ namespace Scraper
             }
 
             // Check .txt files for changes
-            var (linesAddedToLatest, linesRemovedFromOriginal, fileNamesList) = GetTextFileChanges(originalFolder, latestFolder);
+            var (linesAddedToLatest, linesRemovedFromOriginal) = GetTextFileChanges(originalFolder, latestFolder);
 
             if (_config.ConsoleLogging)
             {
@@ -59,7 +60,6 @@ namespace Scraper
             {
                 LinesAddedToLatest = linesAddedToLatest,
                 LinesRemovedFromOriginal = linesRemovedFromOriginal,
-                FileNamesList = fileNamesList,
                 FilesAdded = addedToOriginal,
                 FilesRemoved = removedFromOriginal,
                 IsComparisonComplete = true,
@@ -75,10 +75,7 @@ namespace Scraper
         /// <param name="linesRemovedFromOriginal"></param>
         public void TextDifferencesConsoleLogging(ConcurrentBag<string> linesAdded, ConcurrentBag<string> linesRemovedFromOriginal)
         {
-            var linesAddedList = linesAdded.ToList();
-            var removedFromOriginalList = linesRemovedFromOriginal.ToList();
-
-            if (linesAddedList.Count() > 0)
+            if (linesAdded.Count() > 0)
             {
                 Console.WriteLine("");
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -86,7 +83,7 @@ namespace Scraper
                 Console.WriteLine("");
                 Console.ForegroundColor = ConsoleColor.Gray;
 
-                foreach (var line in linesAddedList)
+                foreach (var line in linesAdded)
                 {
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.WriteLine("");
@@ -95,7 +92,7 @@ namespace Scraper
 
                 }
             }
-            if (removedFromOriginalList.Count() > 0)
+            if (linesRemovedFromOriginal.Count() > 0)
             {
                 Console.WriteLine("");
                 Console.ForegroundColor = ConsoleColor.Red;
@@ -110,6 +107,13 @@ namespace Scraper
                     Console.WriteLine(line);
                     Console.ForegroundColor = ConsoleColor.Gray;
                 }
+            }
+            if (linesRemovedFromOriginal.Count() == 0 && linesAdded.Count() == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"The files in both folder are the same!");
+                Console.WriteLine("");
+                Console.ForegroundColor = ConsoleColor.Gray;
             }
 
             if (!_config.RunScheduled)
@@ -157,6 +161,12 @@ namespace Scraper
                     Console.ForegroundColor = ConsoleColor.Gray;
                 }
             }
+            if (addedToOriginal.Count() == 0 && removedFromOriginal.Count() == 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine("Both folders have the same files!");
+                Console.ForegroundColor = ConsoleColor.Gray;
+            }
 
             if (!_config.RunScheduled)
             {
@@ -173,19 +183,18 @@ namespace Scraper
         /// <param name="originalFolder"></param>
         /// <param name="latestFolder"></param>
         /// <returns></returns>
-        public (ConcurrentBag<string>, ConcurrentBag<string>, ConcurrentBag<string>) GetTextFileChanges(DirectoryInfo originalFolder,
-            DirectoryInfo latestFolder)
+        public (ConcurrentBag<string>, ConcurrentBag<string>) GetTextFileChanges(DirectoryInfo originalFolder, DirectoryInfo latestFolder)
         {
             var changesListAddedToLatest = new ConcurrentBag<string>();
             var originalListRemovedFromLatest = new ConcurrentBag<string>();
-            var fileNameList = new ConcurrentBag<string>();
 
-            Parallel.ForEach(originalFolder.GetFiles(), (originalFile) =>
+            Parallel.ForEach (originalFolder.GetFiles(), (originalFile) =>
             {
                 if (originalFile.Name.Split('.')[^1] == "txt" || originalFile.Name.Split('.')[^1] == "html")
                 {
                     if (File.Exists($"{latestFolder.FullName}\\{originalFile.Name}"))
                     {
+                        var htmlToText = new HtmlToText();
                         var latestFile = latestFolder.GetFiles(originalFile.Name).FirstOrDefault();
 
                         var latestFileLines = File.ReadAllLines(latestFile.FullName);
@@ -194,20 +203,29 @@ namespace Scraper
                         IEnumerable<string> inFirstNotInSecond = originalFileLines.Except(latestFileLines);
                         IEnumerable<string> inSecondNotInFirst = latestFileLines.Except(originalFileLines);
 
-                        // If file (either original or latest) is changed add file name to list
-                        if (inFirstNotInSecond.Count() > 0 && inSecondNotInFirst.Count() > 0)
-                        {
-                            fileNameList.Add(latestFile.Name);
-                        }
-
                         // In the original file but have been removed from the latest file (have been removed)
                         if (inFirstNotInSecond.Count() > 0)
                         {
+                            //Parallel.ForEach(inFirstNotInSecond, (line) =>
+                            //{
+                            //    if (IsStringHtml(line))
+                            //    {
+                            //        var convertedLine = _htmlToText.Convert(line);
+                            //        if (!string.IsNullOrEmpty(convertedLine))
+                            //        {
+                            //            originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                            //        }
+                            //    }
+                            //    else
+                            //    {
+                            //        originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + line);
+                            //    }
+                            //});
                             foreach (var line in inFirstNotInSecond)
                             {
                                 if (IsStringHtml(line))
                                 {
-                                    var convertedLine = _htmlToText.Convert(line);
+                                    var convertedLine = htmlToText.Convert(line);
                                     if (!string.IsNullOrEmpty(convertedLine))
                                     {
                                         originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + convertedLine);
@@ -223,14 +241,29 @@ namespace Scraper
                         // In the latest file but was not present in the original (have been added)
                         if (inSecondNotInFirst.Count() > 0)
                         {
+                            //Parallel.ForEach(inSecondNotInFirst, (line) =>
+                            //{
+                            //    if (IsStringHtml(line))
+                            //    {
+                            //        var convertedLine = _htmlToText.Convert(line);
+                            //        if (!string.IsNullOrEmpty(convertedLine))
+                            //        {
+                            //            changesListAddedToLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                            //        }
+                            //    }
+                            //    else
+                            //    {
+                            //        changesListAddedToLatest.Add($"[{latestFile.Name}]: " + line);
+                            //    }
+                            //});
                             foreach (var line in inSecondNotInFirst)
                             {
                                 if (IsStringHtml(line))
                                 {
-                                    var convertedLine = _htmlToText.Convert(line);
+                                    var convertedLine = htmlToText.Convert(line);
                                     if (!string.IsNullOrEmpty(convertedLine))
                                     {
-                                        changesListAddedToLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                                        changesListAddedToLatest.Add($"[{GetUrlFromFileName(latestFile.Name)}]: " + convertedLine);
                                     }
                                 }
                                 else
@@ -243,7 +276,30 @@ namespace Scraper
                 }
             });
 
-            return (changesListAddedToLatest, originalListRemovedFromLatest, fileNameList);
+            return (changesListAddedToLatest, originalListRemovedFromLatest);
+        }
+
+        /// <summary>
+        /// Get the original url back from the filename
+        /// </summary>
+        /// <param name="fileName"></param>
+        /// <returns></returns>
+        public string GetUrlFromFileName(string fileName)
+        {
+            var urlBuilder = new StringBuilder();
+            urlBuilder.Append("https://");
+
+            var nameSplit = fileName.Split('.');
+            if (nameSplit[^1] == "txt" || nameSplit[^1] == "html")
+            {
+                urlBuilder.Append(fileName.Replace("{FS}", "/").Replace($".{nameSplit[^1]}", ""));
+            }
+            else
+            {
+                urlBuilder.Append(fileName.Replace("{FS}", "/"));
+            }
+
+            return urlBuilder.ToString();
         }
 
         /// <summary>

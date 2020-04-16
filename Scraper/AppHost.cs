@@ -260,7 +260,6 @@ namespace Scraper
             {
                 FilesAdded = comparison.FilesAdded?.ToList() ?? new List<string>(),
                 FilesRemoved = comparison.FilesRemoved?.ToList() ?? new List<string>(),
-                FileNamesList = comparison.FileNamesList?.ToList() ?? new List<string>(),
                 LinesAddedToLatest = comparison.LinesAddedToLatest?.ToList() ?? new List<string>(),
                 LinesRemovedFromOriginal = comparison.LinesRemovedFromOriginal?.ToList() ?? new List<string>(),
                 DateTime = DateTime.Now,

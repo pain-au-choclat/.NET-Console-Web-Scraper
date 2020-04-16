@@ -1,9 +1,11 @@
 ﻿using Microsoft.Extensions.Options;
 using Scraper.Interfaces;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -183,7 +185,8 @@ namespace Scraper
                 // Add a header to the request if specified in appsettings.json
                 if (!string.IsNullOrWhiteSpace(_config.HeaderName) && !string.IsNullOrWhiteSpace(_config.HeaderValue))
                 {
-                    httpRequest.Headers.Add(_config.HeaderValue, _config.HeaderValue);
+                    httpRequest.Headers.Add(_config.HeaderName, _config.HeaderValue);
+                    httpRequest.Headers.ConnectionClose = false;
                 }
                 
                 try
@@ -235,7 +238,18 @@ namespace Scraper
                         var responseBody = "";
                         if (httpResponse.Content.Headers.ContentType.MediaType.Contains("text"))
                         {
-                            responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            // Deal with encoded html if need be
+                            if (httpResponse.Content.Headers.ContentEncoding.ToString() == "gzip")
+                            {
+                                using Stream stream = await httpResponse.Content.ReadAsStreamAsync();
+                                using Stream decompressed = new GZipStream(stream, CompressionMode.Decompress);
+                                using StreamReader reader = new StreamReader(decompressed);
+                                responseBody = reader.ReadToEnd();
+                            }
+                            else
+                            {
+                                responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+                            }
                         }
                         if (!string.IsNullOrWhiteSpace(responseBody))
                         {
@@ -253,6 +267,7 @@ namespace Scraper
                                 filePath += $"{urlSplit[^1]}";
                             }
 
+                            // Write file to disk
                             using (StreamWriter sw = new StreamWriter(@$"{filePath}"))
                             {
                                 await sw.WriteLineAsync(responseBody);
@@ -264,7 +279,16 @@ namespace Scraper
                             }
 
                             // Get all urls from current html content
-                            var urlsFromHtml = GetUrlsForSite(responseBody);
+                            var urlsFromHtml = GetPlainUrlsForPage(responseBody);
+
+                            // Check href for "/someurl" urls
+                            var urlsFromHref = await CheckHrefsForUrls(filePath).ConfigureAwait(false);
+
+                            if (urlsFromHref.Count > 0)
+                            {
+                                urlsFromHtml.AddRange(urlsFromHref.ToList().Distinct());
+                            }
+
                             if (urlsFromHtml.Count > 0)
                             {
                                 newUrls.AddRange(urlsFromHtml);
@@ -334,6 +358,36 @@ namespace Scraper
         }
 
         /// <summary>
+        /// Checks every href "/someurl" urls
+        /// </summary>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public async Task<ConcurrentBag<string>> CheckHrefsForUrls(string filePath)
+        {
+            var fileLines = await File.ReadAllLinesAsync(filePath);
+            var regexPattern = @"href=\""(.*?)\""";
+            var regex = new Regex(regexPattern, RegexOptions.IgnoreCase);
+            var urls = new ConcurrentBag<string>();
+
+            Parallel.ForEach(fileLines, (line) =>
+            {
+                if (line.Contains("href=\"/"))
+                {
+                    var match = regex.Match(line);
+
+                    while (match.Success)
+                    {
+                        urls.Add(_config.RootUrl + match.Groups[1].Value);
+
+                        match = match.NextMatch();
+                    }
+                }
+            });
+
+            return urls;
+        }
+
+        /// <summary>
         /// Saves streams to disk with appropriate file extension. 
         /// </summary>
         /// <param name="stream"></param>
@@ -374,7 +428,7 @@ namespace Scraper
         /// </summary>
         /// <param name="htmlContent"></param>
         /// <returns></returns>
-        public List<string> GetUrlsForSite(string htmlContent)
+        public List<string> GetPlainUrlsForPage(string htmlContent)
         {
             // Get all the urls that contain the root url from the root html
             var regexPattern = @"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)";

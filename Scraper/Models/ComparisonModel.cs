@@ -9,8 +9,6 @@ namespace Scraper.Models
 
         public ConcurrentBag<string> LinesRemovedFromOriginal { get; set; }
 
-        public ConcurrentBag<string> FileNamesList { get; set; }
-
         public IEnumerable<string> FilesRemoved { get; set; }
 
         public IEnumerable<string> FilesAdded { get; set; }

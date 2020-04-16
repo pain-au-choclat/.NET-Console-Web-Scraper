@@ -22,7 +22,7 @@ namespace Scraper
         private int _pos;
 
         // Static constructor (one time only)
-        public HtmlToText()
+        static HtmlToText()
         {
             _tags = new Dictionary<string, string>
             {

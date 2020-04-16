@@ -13,8 +13,6 @@ namespace Scraper.Models
 
         public List<string> FilesRemoved { get; set; }
 
-        public List<string> FileNamesList { get; set; }
-
         public DateTime DateTime { get; set; }
 
         public string RootUrl { get; set; }

@@ -42,6 +42,10 @@
                                                         </p>
                                                     }
                                                 }
+                                                @if (Model.LinesAddedToLatest.Count == 0 & Model.LinesRemovedFromOriginal.Count == 0)
+                                                {
+                                                    <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">There has been no changes to the files of the website</p>
+                                                }
                                                 @if (Model.FilesRemoved.Count > 0)
                                                 {
                                                     <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">The following files have been removed:</p>
@@ -61,6 +65,10 @@
                                                             <span style="white-space: pre-line">@fileName</span>
                                                         </p>
                                                     }
+                                                }
+                                                @if (Model.FilesAdded.Count == 0 & Model.FilesRemoved.Count == 0)
+                                                {
+                                                    <p class="bold" style="font-size: 13px; font-weight: bold; margin: 0 0 1.7em; line-height: 1.5em; font-family: Lucida Sans Unicode; color: #666;">There has been no files added to or removed from the website</p>
                                                 }
                                             </td>
                                         </tr>
