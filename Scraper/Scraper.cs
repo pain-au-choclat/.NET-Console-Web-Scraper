@@ -157,7 +157,7 @@ namespace Scraper
             Buffer.BlockCopy(salt, 0, dst, 1, 0x10);
             Buffer.BlockCopy(buffer2, 0, dst, 0x11, 0x20);
 
-            return Convert.ToBase64String(dst);
+            return Convert.ToBase64String(dst).Replace('/', '_').Replace('\\', '_');
         }
 
         /// <summary>
@@ -304,7 +304,7 @@ namespace Scraper
                                     using Stream stream = await httpResponse.Content.ReadAsStreamAsync();
                                     using Stream decompressed = new GZipStream(stream, CompressionMode.Decompress);
                                     using StreamReader reader = new StreamReader(decompressed);
-                                    responseBody = reader.ReadToEnd();
+                                    responseBody = await reader.ReadToEndAsync().ConfigureAwait(false);
                                 }
                                 else
                                 {
