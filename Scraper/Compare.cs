@@ -204,21 +204,6 @@ namespace Scraper
                         // In the original file but have been removed from the latest file (have been removed)
                         if (inFirstNotInSecond.Count() > 0)
                         {
-                            //Parallel.ForEach(inFirstNotInSecond, (line) =>
-                            //{
-                            //    if (IsStringHtml(line))
-                            //    {
-                            //        var convertedLine = _htmlToText.Convert(line);
-                            //        if (!string.IsNullOrEmpty(convertedLine))
-                            //        {
-                            //            originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + convertedLine);
-                            //        }
-                            //    }
-                            //    else
-                            //    {
-                            //        originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + line);
-                            //    }
-                            //});
                             foreach (var line in inFirstNotInSecond)
                             {
                                 if (IsStringHtml(line))
@@ -239,21 +224,6 @@ namespace Scraper
                         // In the latest file but was not present in the original (have been added)
                         if (inSecondNotInFirst.Count() > 0)
                         {
-                            //Parallel.ForEach(inSecondNotInFirst, (line) =>
-                            //{
-                            //    if (IsStringHtml(line))
-                            //    {
-                            //        var convertedLine = _htmlToText.Convert(line);
-                            //        if (!string.IsNullOrEmpty(convertedLine))
-                            //        {
-                            //            changesListAddedToLatest.Add($"[{latestFile.Name}]: " + convertedLine);
-                            //        }
-                            //    }
-                            //    else
-                            //    {
-                            //        changesListAddedToLatest.Add($"[{latestFile.Name}]: " + line);
-                            //    }
-                            //});
                             foreach (var line in inSecondNotInFirst)
                             {
                                 if (IsStringHtml(line))

@@ -9,8 +9,10 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Scraper
@@ -89,32 +91,73 @@ namespace Scraper
             var newUrl = "";
             var sb = new StringBuilder();
 
-            if (url.StartsWith("https://"))
+            if (url.Length > 250)
             {
-                newUrl = url.Substring("https://".Length);
+                sb.Append(HashString(url));
             }
-
-            foreach (var c in newUrl)
+            else
             {
-                if (c == '/')
+                if (url.StartsWith("https://"))
                 {
-                    sb.Append("{FS}");
+                    newUrl = url.Substring("https://".Length);
                 }
-                else if (c == '?')
+
+                foreach (var c in newUrl)
                 {
-                    sb.Append('$');
-                }
-                else if (c == ':')
-                {
-                    // Do nothing with these
-                }
-                else
-                {
-                    sb.Append(c);
+                    if (c == '/')
+                    {
+                        sb.Append("{FS}");
+                    }
+                    else if (c == '?')
+                    {
+                        sb.Append('$');
+                    }
+                    else if (c == ':')
+                    {
+                        // Do nothing with these
+                    }
+                    else if (c == ';')
+                    {
+                        // Do nadda
+                    }
+                    else
+                    {
+                        sb.Append(c);
+                    }
                 }
             }
 
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Hash a string which is used for file names if need be
+        /// </summary>
+        /// <param name="url"></param>
+        /// <returns></returns>
+        public string HashString(string url)
+        {
+            // Default Hashing implementation https://stackoverflow.com/a/20622428
+            byte[] salt;
+            byte[] buffer2;
+
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return null;
+            }
+
+            // PBKDF, 1000 iterations
+            using (var bytes = new Rfc2898DeriveBytes(url, 0x10, 0x3e8))
+            {
+                salt = bytes.Salt;
+                buffer2 = bytes.GetBytes(0x20);
+            }
+            var dst = new byte[0x31];
+            // copies 16 chars from salt to position 1 -> 17 in dst
+            Buffer.BlockCopy(salt, 0, dst, 1, 0x10);
+            Buffer.BlockCopy(buffer2, 0, dst, 0x11, 0x20);
+
+            return Convert.ToBase64String(dst);
         }
 
         /// <summary>
@@ -179,139 +222,157 @@ namespace Scraper
                     }
                 }
 
-                var httpResponse = new HttpResponseMessage();
-                var httpRequest = new HttpRequestMessage(HttpMethod.Get, url);
-                
-                // Add a header to the request if specified in appsettings.json
-                if (!string.IsNullOrWhiteSpace(_config.HeaderName) && !string.IsNullOrWhiteSpace(_config.HeaderValue))
+                if (!string.IsNullOrWhiteSpace(url))
                 {
-                    httpRequest.Headers.Add(_config.HeaderName, _config.HeaderValue);
-                    httpRequest.Headers.ConnectionClose = false;
-                }
-                
-                try
-                {
-                    httpResponse = await _httpClient.SendAsync(httpRequest).ConfigureAwait(false);
+                    var httpResponse = new HttpResponseMessage();
+                    var httpRequest = new HttpRequestMessage();
 
-                    if (httpResponse.StatusCode == HttpStatusCode.OK)
+                    var uri = new Uri(url);
+
+                    try
+                    {
+                        httpRequest.Method = HttpMethod.Get;
+                        httpRequest.RequestUri = uri;
+                    }
+                    catch (HttpRequestException e)
                     {
                         if (_config.ConsoleLogging)
                         {
-                            Console.WriteLine($"Html Response successfull: {url}");
+                            Console.WriteLine($"Unable create HttpRequestMessage message: {e}");
                         }
+                    }
 
-                        // Deal with urls that point to images
-                        if (httpResponse.Content.Headers.ContentType.MediaType.Contains("image"))
+                    // Add a header to the request if specified in appsettings.json
+                    if (!string.IsNullOrWhiteSpace(_config.HeaderName) && !string.IsNullOrWhiteSpace(_config.HeaderValue))
+                    {
+                        httpRequest.Headers.Add(_config.HeaderName, _config.HeaderValue);
+                        httpRequest.Headers.ConnectionClose = false;
+                    }
+
+                    try
+                    {
+                        httpResponse = await _httpClient.SendAsync(httpRequest).ConfigureAwait(false);
+
+                        if (httpResponse.StatusCode == HttpStatusCode.OK)
                         {
                             if (_config.ConsoleLogging)
                             {
-                                Console.WriteLine($"Html Response is an image");
+                                Console.WriteLine($"Html Response successfull: {url}");
                             }
 
-                            var contentType = httpResponse.Content.Headers.ContentType.MediaType;
-                            var streamImage = await _httpClient.GetStreamAsync(url).ConfigureAwait(false);
-                            var (imageSaved, imageTitle) = await SaveStreamToDisk(streamImage, url, path, contentType).ConfigureAwait(false);
-                            if (_config.ConsoleLogging && imageSaved)
+                            // Deal with urls that point to images
+                            if (httpResponse.Content.Headers.ContentType.MediaType.Contains("image"))
                             {
-                                Console.WriteLine($"Image successfully saved: {imageTitle}");
-                            }
-                        }
+                                if (_config.ConsoleLogging)
+                                {
+                                    Console.WriteLine($"Html Response is an image");
+                                }
 
-                        // Deal with urls that point to application/ i.e javascript
-                        if (httpResponse.Content.Headers.ContentType.MediaType.Contains("application"))
-                        {
-                            if (_config.ConsoleLogging)
-                            {
-                                Console.WriteLine($"Html response is an {httpResponse.Content.Headers.ContentType.MediaType}");
-                            }
-
-                            var contentType = httpResponse.Content.Headers.ContentType.MediaType;
-                            var streamApp = await _httpClient.GetStreamAsync(url).ConfigureAwait(false);
-                            var (appSaved, appTitle) = await SaveStreamToDisk(streamApp, url, path, contentType).ConfigureAwait(false);
-                            if (_config.ConsoleLogging && appSaved)
-                            {
-                                Console.WriteLine($"App successfully saved: {appTitle}");
-                            }
-                        }
-
-                        // Deal with urls that result in html or text content
-                        var responseBody = "";
-                        if (httpResponse.Content.Headers.ContentType.MediaType.Contains("text"))
-                        {
-                            // Deal with encoded html if need be
-                            if (httpResponse.Content.Headers.ContentEncoding.ToString() == "gzip")
-                            {
-                                using Stream stream = await httpResponse.Content.ReadAsStreamAsync();
-                                using Stream decompressed = new GZipStream(stream, CompressionMode.Decompress);
-                                using StreamReader reader = new StreamReader(decompressed);
-                                responseBody = reader.ReadToEnd();
-                            }
-                            else
-                            {
-                                responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
-                            }
-                        }
-                        if (!string.IsNullOrWhiteSpace(responseBody))
-                        {
-                            // Try and get correct file name extensions from url
-                            var filePath = $"{path}\\";
-                            var urlExtension = url.Split('.');
-                            if (urlExtension[^1] != "xml" && urlExtension[^1] != "csv" && urlExtension[^1] != "css" && urlExtension[^1] != "plain"
-                                && urlExtension[^1] != "js" && urlExtension[^1] != "html")
-                            {
-                                filePath += $"{GetPlainUrl(url)}.txt";
-                            }
-                            else
-                            {
-                                var urlSplit = url.Split('/');
-                                filePath += $"{urlSplit[^1]}";
+                                var contentType = httpResponse.Content.Headers.ContentType.MediaType;
+                                var streamImage = await _httpClient.GetStreamAsync(url).ConfigureAwait(false);
+                                var (imageSaved, imageTitle) = await SaveStreamToDisk(streamImage, url, path, contentType).ConfigureAwait(false);
+                                if (_config.ConsoleLogging && imageSaved)
+                                {
+                                    Console.WriteLine($"Image successfully saved: {imageTitle}");
+                                }
                             }
 
-                            // Write file to disk
-                            using (StreamWriter sw = new StreamWriter(@$"{filePath}"))
+                            // Deal with urls that point to application/ i.e javascript
+                            if (httpResponse.Content.Headers.ContentType.MediaType.Contains("application"))
                             {
-                                await sw.WriteLineAsync(responseBody);
+                                if (_config.ConsoleLogging)
+                                {
+                                    Console.WriteLine($"Html response is an {httpResponse.Content.Headers.ContentType.MediaType}");
+                                }
+
+                                var contentType = httpResponse.Content.Headers.ContentType.MediaType;
+                                var streamApp = await _httpClient.GetStreamAsync(url).ConfigureAwait(false);
+                                var (appSaved, appTitle) = await SaveStreamToDisk(streamApp, url, path, contentType).ConfigureAwait(false);
+                                if (_config.ConsoleLogging && appSaved)
+                                {
+                                    Console.WriteLine($"App successfully saved: {appTitle}");
+                                }
                             }
 
-                            if (_config.ConsoleLogging)
+                            // Deal with urls that result in html or text content
+                            var responseBody = "";
+                            if (httpResponse.Content.Headers.ContentType.MediaType.Contains("text"))
                             {
-                                Console.WriteLine($"Html Response is text/html and has been successfully saved");
+                                // Deal with encoded html if need be
+                                if (httpResponse.Content.Headers.ContentEncoding.ToString() == "gzip")
+                                {
+                                    using Stream stream = await httpResponse.Content.ReadAsStreamAsync();
+                                    using Stream decompressed = new GZipStream(stream, CompressionMode.Decompress);
+                                    using StreamReader reader = new StreamReader(decompressed);
+                                    responseBody = reader.ReadToEnd();
+                                }
+                                else
+                                {
+                                    responseBody = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
+                                }
                             }
-
-                            // Get all urls from current html content
-                            var urlsFromHtml = GetPlainUrlsForPage(responseBody);
-
-                            // Check href for "/someurl" urls
-                            var urlsFromHref = await CheckHrefsForUrls(filePath).ConfigureAwait(false);
-
-                            if (urlsFromHref.Count > 0)
+                            if (!string.IsNullOrWhiteSpace(responseBody))
                             {
-                                urlsFromHtml.AddRange(urlsFromHref.ToList().Distinct());
-                            }
+                                // Try and get correct file name extensions from url
+                                var filePath = $"{path}\\";
+                                var urlExtension = url.Split('.');
+                                if (urlExtension[^1] != "xml" && urlExtension[^1] != "csv" && urlExtension[^1] != "css" && urlExtension[^1] != "plain"
+                                    && urlExtension[^1] != "js" && urlExtension[^1] != "html")
+                                {
+                                    filePath += $"{GetPlainUrl(url)}.txt";
+                                }
+                                else
+                                {
+                                    var urlSplit = url.Split('/');
+                                    filePath += $"{urlSplit[^1]}";
+                                }
 
-                            if (urlsFromHtml.Count > 0)
-                            {
-                                newUrls.AddRange(urlsFromHtml);
+                                // Write file to disk
+                                using (StreamWriter sw = new StreamWriter(@$"{filePath}"))
+                                {
+                                    await sw.WriteLineAsync(responseBody);
+                                }
 
                                 if (_config.ConsoleLogging)
                                 {
-                                    Console.WriteLine($"{urlsFromHtml.Count} Urls obtained from current url. {newUrls.Count} Urls obtained in current iteration");
+                                    Console.WriteLine($"Html Response is text/html and has been successfully saved");
+                                }
+
+                                // Get all urls from current html content
+                                var urlsFromHtml = GetPlainUrlsForPage(responseBody);
+
+                                // Check href for "/someurl" urls
+                                var urlsFromHref = await CheckHrefsForUrls(filePath).ConfigureAwait(false);
+
+                                if (urlsFromHref.Count > 0)
+                                {
+                                    urlsFromHtml.AddRange(urlsFromHref.ToList().Distinct());
+                                }
+
+                                if (urlsFromHtml.Count > 0)
+                                {
+                                    newUrls.AddRange(urlsFromHtml);
+
+                                    if (_config.ConsoleLogging)
+                                    {
+                                        Console.WriteLine($"{urlsFromHtml.Count} Urls obtained from current url. {newUrls.Count} Urls obtained in current iteration");
+                                    }
                                 }
                             }
                         }
-                    }
-                    else
-                    {
-                        if (_config.ConsoleLogging)
+                        else
                         {
-                            Console.WriteLine($"Following status code : {httpResponse.StatusCode} for {url}");
+                            if (_config.ConsoleLogging)
+                            {
+                                Console.WriteLine($"Following status code : {httpResponse.StatusCode} for {url}");
+                            }
                         }
                     }
-                }
-                catch (HttpRequestException e)
-                {
-                    Console.WriteLine("Http request exception caught!");
-                    Console.WriteLine($"Message {e.Message}");
+                    catch (HttpRequestException e)
+                    {
+                        Console.WriteLine("Http request exception caught!");
+                        Console.WriteLine($"Message {e.Message}");
+                    }
                 }
             }
 
@@ -319,15 +380,15 @@ namespace Scraper
             {
                 // Check we are not going over the same urls twice using Urls source of truth
                 var clonedList = new List<string>();
-                clonedList.AddRange(newUrls);
+                clonedList.AddRange(newUrls.Distinct());
 
-                foreach (var url in clonedList)
+                Parallel.ForEach(clonedList, (url) =>
                 {
                     if (Urls.Contains(url))
                     {
                         newUrls.Remove(url);
                     }
-                }
+                });
 
                 _stopwatch.Stop();
                 if (_config.ConsoleLogging)
@@ -363,11 +424,30 @@ namespace Scraper
         /// <param name="filePath"></param>
         /// <returns></returns>
         public async Task<ConcurrentBag<string>> CheckHrefsForUrls(string filePath)
-        {
-            var fileLines = await File.ReadAllLinesAsync(filePath);
-            var regexPattern = @"href=\""(.*?)\""";
+        {       
+            var regexPattern = @"href=\""(\/.*?)\""";
             var regex = new Regex(regexPattern, RegexOptions.IgnoreCase);
             var urls = new ConcurrentBag<string>();
+            string[] fileLines = new string[] { };
+
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    fileLines = await File.ReadAllLinesAsync(filePath);
+                }
+                catch
+                {
+                    if (_config.ConsoleLogging)
+                    {
+                        Console.WriteLine("File most probably doesnt exist yet!");
+                        Console.WriteLine("Wait for 100ms");
+                    }
+
+                    Thread.Sleep(100);
+                    fileLines = await File.ReadAllLinesAsync(filePath);
+                }
+            }
 
             Parallel.ForEach(fileLines, (line) =>
             {
@@ -377,7 +457,23 @@ namespace Scraper
 
                     while (match.Success)
                     {
-                        urls.Add(_config.RootUrl + match.Groups[1].Value);
+                        var url = match.Groups[1].Value;
+
+                        if (url.Length > 1)
+                        {
+                            if (url[0] == '/' && url[1] != '/')
+                            {
+                                urls.Add(_config.RootUrl + url);
+                            }
+                            else if (url[1] == '/' && url.Contains(GetPlainUrl(_config.RootUrl)))
+                            {
+                                urls.Add("https:" + url);
+                            }
+                            else if (url[0] != '/')
+                            {
+                                urls.Add($"{_config.RootUrl}/" + url);
+                            }
+                        }
 
                         match = match.NextMatch();
                     }
@@ -396,21 +492,29 @@ namespace Scraper
         /// <returns></returns>
         public async Task<(bool, string)> SaveStreamToDisk(Stream stream, string url, string path, string contentType)
         {
-            var fileName = url.Split('/');
+            var fileName = url.Split('/')[^1];
+
+            // If file already exists, hash file name and add it the file name
+            if (File.Exists($"{path}\\{fileName}"))
+            {
+                var hashedFileName = HashString(fileName);
+                fileName = $"{hashedFileName}_{fileName}";
+            }
+
             string imageName;
 
-            if (contentType.Contains("image") && !fileName[^1].Contains("."))
+            if (contentType.Contains("image") && !fileName.Contains("."))
             {
-                imageName = fileName[^1] + ".jfif";
+                imageName = fileName + ".jfif";
             }
             else
             {
-                imageName = fileName[^1];
+                imageName = fileName;
             }
 
             try
             {
-                using var fileStream = File.Create($"{path}\\{imageName}");
+                using var fileStream = File.Create($"{path}\\{(string.IsNullOrWhiteSpace(imageName) ? fileName : imageName)}");
                 await stream.CopyToAsync(fileStream).ConfigureAwait(false);
             }
             catch (Exception e)
