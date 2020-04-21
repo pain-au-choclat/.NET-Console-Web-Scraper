@@ -211,12 +211,12 @@ namespace Scraper
                                     var convertedLine = htmlToText.Convert(line);
                                     if (!string.IsNullOrEmpty(convertedLine))
                                     {
-                                        originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + convertedLine);
+                                        originalListRemovedFromLatest.Add($"[{GetUrlFromFileName(latestFile.Name)}]: " + convertedLine);
                                     }
                                 }
                                 else
                                 {
-                                    originalListRemovedFromLatest.Add($"[{latestFile.Name}]: " + line);
+                                    originalListRemovedFromLatest.Add($"[{GetUrlFromFileName(latestFile.Name)}]: " + line);
                                 }
                             }
                         }
@@ -236,7 +236,7 @@ namespace Scraper
                                 }
                                 else
                                 {
-                                    changesListAddedToLatest.Add($"[{latestFile.Name}]: " + line);
+                                    changesListAddedToLatest.Add($"[{GetUrlFromFileName(latestFile.Name)}]: " + line);
                                 }
                             }
                         }
